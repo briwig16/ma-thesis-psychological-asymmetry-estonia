@@ -1,4 +1,4 @@
-# EIM2 — Ethnic Identity & Intergroup Relations in Estonia
+# MA Thesis — Psychological Asymmetry in Estonia
 
 A quantitative social-science project analyzing survey data on identity,
 intergroup attitudes, and contact between Estonia's ethnic-majority
@@ -45,7 +45,7 @@ publication-style reporting — written primarily in **Python** with an
 | `code/replication/` | Independent cross-language verification scripts |
 | `reports/` | Generated APA-style result tables and summaries (aggregated) |
 | `reports/generators/` | Node scripts that build the `.docx` report tables |
-| `viz/` | Figures — forest plots, dumbbell/gap charts, density and item plots |
+| `visualizations/` | Figures — forest plots, dumbbell/gap charts, density and item plots |
 | `requirements.txt` | Python dependencies |
 
 ## Running it
