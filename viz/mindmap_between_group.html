@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EIM Between-Group Comparison: Estonian vs Russian</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0c12;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 20px;
+  }
+  svg { display: block; }
+  #tooltip {
+    position: fixed;
+    background: rgba(10, 12, 22, 0.97);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #e2e8f0;
+    pointer-events: none;
+    display: none;
+    z-index: 9999;
+    max-width: 280px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+    line-height: 1.6;
+  }
+  #tooltip .tt-header {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  #tooltip .tt-composite {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 6px;
+  }
+  #tooltip .tt-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 2px 0;
+    font-size: 12px;
+  }
+  #tooltip .tt-row .label { color: #94a3b8; }
+  #tooltip .tt-row .value { color: #f1f5f9; font-weight: 600; }
+  #tooltip .tt-note {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #94a3b8;
+    font-style: italic;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    padding-top: 6px;
+  }
+  #tooltip .tt-scale {
+    margin-top: 4px;
+    font-size: 10px;
+    color: #64748b;
+  }
+</style>
+</head>
+<body>
+<div id="tooltip"></div>
+<script>
+const W = 1600, H = 1150;
+const CX = 800, CY = 510;
+const R1 = 230, R2 = 400;
+const LEAF_OFFSET = 0.22;
+
+const composites = [
+  {
+    name: "Superordinate\nIdentity",
+    color: "#818cf8",
+    scale: "Lower = stronger sense of belonging to Estonia",
+    yr2020: { d: -1.08, sig: "***", estM: "1.45", rusM: "2.08", note: "Russians feel weaker belonging — large gap" },
+    yr2023: { d: -0.79, sig: "***", estM: "1.50", rusM: "2.05", note: "Gap narrowed but remains large" },
+    gapChange: "narrow"
+  },
+  {
+    name: "SD: Primary\nOut-group",
+    color: "#f87171",
+    scale: "Higher = more social distance from Estonian/Russian speakers",
+    yr2020: { d: +0.74, sig: "***", estM: "2.51", rusM: "1.90", note: "Estonians more distant from Russian-speakers" },
+    yr2023: { d: +1.18, sig: "***", estM: "2.91", rusM: "1.83", note: "Gap nearly doubled — sharpest divergence" },
+    gapChange: "widen"
+  },
+  {
+    name: "SD: General\nOut-group",
+    color: "#38bdf8",
+    scale: "Higher = more social distance from other Europeans & non-Europeans",
+    yr2020: { d: -0.21, sig: "***", estM: "2.91", rusM: "3.12", note: "Russians slightly more distant" },
+    yr2023: { d: +0.11, sig: "*",   estM: "2.70", rusM: "2.60", note: "Direction reversed — Estonians now slightly more distant" },
+    gapChange: "flip"
+  },
+  {
+    name: "Comp. Opp.\nAssessment",
+    color: "#fb923c",
+    scale: "Lower = perceives greater Estonian structural advantage",
+    yr2020: { d: +0.79, sig: "***", estM: "2.56", rusM: "2.14", note: "Estonians perceive conditions as more equal" },
+    yr2023: { d: +0.74, sig: "***", estM: "2.71", rusM: "2.32", note: "Gap slightly narrowed" },
+    gapChange: "narrow"
+  },
+  {
+    name: "Belief in\nInevitable Conflict",
+    color: "#f97316",
+    scale: "Higher = stronger belief in ethnic conflict",
+    yr2020: { d: -0.44, sig: "***", estM: "2.78", rusM: "3.03", note: "Russians hold stronger conflict beliefs" },
+    yr2023: { d: -0.78, sig: "***", estM: "2.72", rusM: "3.21", note: "Gap widened substantially" },
+    gapChange: "widen"
+  },
+  {
+    name: "Minority Support\nInclusion",
+    color: "#34d399",
+    scale: "Lower = stronger support for minority inclusion in governance",
+    yr2020: { d: +1.00, sig: "***", estM: "2.21", rusM: "1.57", note: "Russians far more supportive of minority inclusion" },
+    yr2023: { d: +1.14, sig: "***", estM: "2.33", rusM: "1.54", note: "Gap widened further" },
+    gapChange: "widen"
+  },
+  {
+    name: "Contact:\nEstonian Spkrs",
+    color: "#a3e635",
+    scale: "Lower = more frequent contact with Estonian speakers",
+    yr2020: { d: -1.89, sig: "***", estM: "1.85", rusM: "3.86", note: "Russians have far less contact with Estonian speakers" },
+    yr2023: { d: -1.57, sig: "***", estM: "1.74", rusM: "3.29", note: "Gap narrowed — Russians contact Estonians more" },
+    gapChange: "narrow"
+  },
+  {
+    name: "Contact:\nRussian Spkrs",
+    color: "#c084fc",
+    scale: "Lower = more frequent contact with Russian speakers",
+    yr2020: { d: +2.25, sig: "***", estM: "3.98", rusM: "1.79", note: "Estonians have far less contact with Russian speakers" },
+    yr2023: { d: +2.25, sig: "***", estM: "3.87", rusM: "1.71", note: "Gap very slightly narrowed" },
+    gapChange: "narrow"
+  }
+];
+
+function gapBadgeInfo(gapChange) {
+  if (gapChange === "widen")  return { text: "gap ↑", color: "#f87171" };
+  if (gapChange === "narrow") return { text: "gap ↓", color: "#34d399" };
+  if (gapChange === "flip")   return { text: "flipped", color: "#c084fc" };
+  return { text: "", color: "#fff" };
+}
+
+function leafColor(d) {
+  return d > 0 ? "#fb923c" : "#38bdf8";
+}
+
+function leafArrow(d) {
+  return d > 0 ? "→" : "←";
+}
+
+function formatD(d) {
+  const sign = d >= 0 ? "+" : "";
+  return sign + d.toFixed(2);
+}
+
+// Create SVG
+const svgNS = "http://www.w3.org/2000/svg";
+const svg = document.createElementNS(svgNS, "svg");
+svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+svg.setAttribute("width", W);
+svg.setAttribute("height", H);
+svg.setAttribute("xmlns", svgNS);
+document.body.appendChild(svg);
+
+// ── Defs ──────────────────────────────────────────────────────────────────────
+const defs = document.createElementNS(svgNS, "defs");
+
+// Background gradient
+const bgGrad = document.createElementNS(svgNS, "radialGradient");
+bgGrad.setAttribute("id", "bgGrad");
+bgGrad.setAttribute("cx", "50%"); bgGrad.setAttribute("cy", "50%");
+bgGrad.setAttribute("r", "70%");
+[["0%","#161b27"],["100%","#0a0c12"]].forEach(([o,c]) => {
+  const s = document.createElementNS(svgNS, "stop");
+  s.setAttribute("offset", o); s.setAttribute("stop-color", c); bgGrad.appendChild(s);
+});
+defs.appendChild(bgGrad);
+
+// Glow filter
+function makeGlow(id, color, stdDev, strength) {
+  const f = document.createElementNS(svgNS, "filter");
+  f.setAttribute("id", id); f.setAttribute("x", "-50%"); f.setAttribute("y", "-50%");
+  f.setAttribute("width", "200%"); f.setAttribute("height", "200%");
+  const fe1 = document.createElementNS(svgNS, "feGaussianBlur");
+  fe1.setAttribute("in", "SourceGraphic"); fe1.setAttribute("stdDeviation", stdDev);
+  fe1.setAttribute("result", "blur");
+  const fe2 = document.createElementNS(svgNS, "feColorMatrix");
+  fe2.setAttribute("in", "blur"); fe2.setAttribute("type", "matrix");
+  fe2.setAttribute("values", `1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 ${strength} 0`);
+  fe2.setAttribute("result", "glow");
+  const fe3 = document.createElementNS(svgNS, "feMerge");
+  [document.createElementNS(svgNS,"feMergeNode"),document.createElementNS(svgNS,"feMergeNode")].forEach((n,i)=>{
+    if(i===1) n.setAttribute("in","SourceGraphic"); fe3.appendChild(n);
+  });
+  fe3.firstChild.setAttribute("in","glow");
+  f.appendChild(fe1); f.appendChild(fe2); f.appendChild(fe3);
+  defs.appendChild(f);
+}
+makeGlow("glow", null, 6, 18);
+makeGlow("leafGlow", null, 4, 12);
+
+// Drop shadow
+const shadow = document.createElementNS(svgNS, "filter");
+shadow.setAttribute("id", "shadow");
+const feDS = document.createElementNS(svgNS, "feDropShadow");
+feDS.setAttribute("dx","0"); feDS.setAttribute("dy","2");
+feDS.setAttribute("stdDeviation","4"); feDS.setAttribute("flood-color","rgba(0,0,0,0.7)");
+shadow.appendChild(feDS);
+defs.appendChild(shadow);
+
+svg.appendChild(defs);
+
+// ── Background ─────────────────────────────────────────────────────────────────
+const bg = document.createElementNS(svgNS, "rect");
+bg.setAttribute("width", W); bg.setAttribute("height", H);
+bg.setAttribute("fill", "url(#bgGrad)");
+svg.appendChild(bg);
+
+// ── Title ──────────────────────────────────────────────────────────────────────
+function makeTspan(text, attrs) {
+  const ts = document.createElementNS(svgNS, "tspan");
+  ts.textContent = text;
+  Object.entries(attrs).forEach(([k,v]) => ts.setAttribute(k, v));
+  return ts;
+}
+
+const titleG = document.createElementNS(svgNS, "g");
+const titleText = document.createElementNS(svgNS, "text");
+titleText.setAttribute("x", W/2); titleText.setAttribute("y", 36);
+titleText.setAttribute("text-anchor", "middle");
+titleText.setAttribute("font-size", "20");
+titleText.setAttribute("font-weight", "700");
+titleText.setAttribute("fill", "#e2e8f0");
+titleText.setAttribute("letter-spacing", "0.5");
+titleText.textContent = "EIM Composite Variables — Estonian vs Russian Respondents";
+titleG.appendChild(titleText);
+
+const subText = document.createElementNS(svgNS, "text");
+subText.setAttribute("x", W/2); subText.setAttribute("y", 60);
+subText.setAttribute("text-anchor", "middle");
+subText.setAttribute("font-size", "12");
+subText.setAttribute("fill", "#64748b");
+subText.setAttribute("letter-spacing", "0.3");
+subText.textContent = "Estonian Integration Monitor  |  Between-Group Comparison  |  Welch's t-test  |  Cohen's d";
+titleG.appendChild(subText);
+svg.appendChild(titleG);
+
+// ── Helper: SVG text element ──────────────────────────────────────────────────
+function svgText(x, y, lines, attrs={}) {
+  const t = document.createElementNS(svgNS, "text");
+  t.setAttribute("x", x); t.setAttribute("y", y);
+  t.setAttribute("text-anchor", attrs["text-anchor"] || "middle");
+  t.setAttribute("dominant-baseline", attrs["dominant-baseline"] || "middle");
+  if (attrs["font-size"]) t.setAttribute("font-size", attrs["font-size"]);
+  if (attrs["font-weight"]) t.setAttribute("font-weight", attrs["font-weight"]);
+  if (attrs["fill"]) t.setAttribute("fill", attrs["fill"]);
+  if (attrs["letter-spacing"]) t.setAttribute("letter-spacing", attrs["letter-spacing"]);
+  if (attrs["font-style"]) t.setAttribute("font-style", attrs["font-style"]);
+  if (Array.isArray(lines)) {
+    lines.forEach((line, i) => {
+      const ts = document.createElementNS(svgNS, "tspan");
+      ts.textContent = line;
+      ts.setAttribute("x", x);
+      if (i === 0) ts.setAttribute("dy", "0");
+      else ts.setAttribute("dy", attrs["dy"] || "1.3em");
+      t.appendChild(ts);
+    });
+  } else {
+    t.textContent = lines;
+  }
+  return t;
+}
+
+// ── Helper: rounded rect ──────────────────────────────────────────────────────
+function roundedRect(x, y, w, h, r, fill, stroke, opacity=1) {
+  const rect = document.createElementNS(svgNS, "rect");
+  rect.setAttribute("x", x - w/2); rect.setAttribute("y", y - h/2);
+  rect.setAttribute("width", w); rect.setAttribute("height", h);
+  rect.setAttribute("rx", r); rect.setAttribute("ry", r);
+  rect.setAttribute("fill", fill);
+  if (stroke) rect.setAttribute("stroke", stroke);
+  rect.setAttribute("fill-opacity", opacity);
+  return rect;
+}
+
+// ── Center node ────────────────────────────────────────────────────────────────
+const centerG = document.createElementNS(svgNS, "g");
+// Outer glow
+const centerGlowEll = document.createElementNS(svgNS, "ellipse");
+centerGlowEll.setAttribute("cx", CX); centerGlowEll.setAttribute("cy", CY);
+centerGlowEll.setAttribute("rx", "68"); centerGlowEll.setAttribute("ry", "68");
+centerGlowEll.setAttribute("fill", "none");
+centerGlowEll.setAttribute("stroke", "rgba(129,140,248,0.25)");
+centerGlowEll.setAttribute("stroke-width", "24");
+centerGlowEll.setAttribute("filter", "url(#glow)");
+centerG.appendChild(centerGlowEll);
+
+const centerCircle = document.createElementNS(svgNS, "circle");
+centerCircle.setAttribute("cx", CX); centerCircle.setAttribute("cy", CY);
+centerCircle.setAttribute("r", "62");
+centerCircle.setAttribute("fill", "#1e2235");
+centerCircle.setAttribute("stroke", "#818cf8");
+centerCircle.setAttribute("stroke-width", "2.5");
+centerCircle.setAttribute("filter", "url(#shadow)");
+centerG.appendChild(centerCircle);
+
+const centerLabel = svgText(CX, CY - 14, ["EIM", "Estonian", "vs", "Russian"], {
+  "font-size": "13", "font-weight": "700", "fill": "#e2e8f0", "dy": "1.25em"
+});
+centerLabel.setAttribute("dominant-baseline", "auto");
+centerG.appendChild(centerLabel);
+svg.appendChild(centerG);
+
+// ── Draw branches ─────────────────────────────────────────────────────────────
+const tooltip = document.getElementById("tooltip");
+let tooltipTimeout;
+
+function showTooltip(evt, comp, year, data) {
+  clearTimeout(tooltipTimeout);
+  const lc = leafColor(data.d);
+  const arrow = leafArrow(data.d);
+  const compDisplay = comp.name.replace(/\n/g, " ");
+  tooltip.innerHTML = `
+    <div class="tt-header" style="color:${lc}">${year}</div>
+    <div class="tt-composite">${compDisplay}</div>
+    <div class="tt-row"><span class="label">Cohen's d</span><span class="value">${formatD(data.d)} ${data.sig}</span></div>
+    <div class="tt-row"><span class="label">Estonian mean</span><span class="value">${data.estM}</span></div>
+    <div class="tt-row"><span class="label">Russian mean</span><span class="value">${data.rusM}</span></div>
+    <div class="tt-note">${data.note}</div>
+    <div class="tt-scale">${comp.scale}</div>
+  `;
+  tooltip.style.display = "block";
+  moveTooltip(evt);
+}
+
+function moveTooltip(evt) {
+  const x = evt.clientX + 16;
+  const y = evt.clientY - 10;
+  const tw = 280;
+  const tx = x + tw > window.innerWidth ? evt.clientX - tw - 16 : x;
+  tooltip.style.left = tx + "px";
+  tooltip.style.top = y + "px";
+}
+
+function hideTooltip() {
+  tooltipTimeout = setTimeout(() => { tooltip.style.display = "none"; }, 120);
+}
+
+composites.forEach((comp, idx) => {
+  const angle = (idx / composites.length) * 2 * Math.PI - Math.PI / 2;
+  const cx = CX + R1 * Math.cos(angle);
+  const cy = CY + R1 * Math.sin(angle);
+
+  // Bezier from center to composite
+  const cpx = CX + (R1 * 0.45) * Math.cos(angle);
+  const cpy = CY + (R1 * 0.45) * Math.sin(angle);
+  const bezier = document.createElementNS(svgNS, "path");
+  bezier.setAttribute("d", `M${CX},${CY} Q${cpx},${cpy} ${cx},${cy}`);
+  bezier.setAttribute("fill", "none");
+  bezier.setAttribute("stroke", comp.color);
+  bezier.setAttribute("stroke-width", "2");
+  bezier.setAttribute("stroke-opacity", "0.5");
+  svg.appendChild(bezier);
+
+  // Leaf positions
+  const angleL = angle - LEAF_OFFSET;
+  const angleR = angle + LEAF_OFFSET;
+  const lx = CX + R2 * Math.cos(angleL);
+  const ly = CY + R2 * Math.sin(angleL);
+  const rx = CX + R2 * Math.cos(angleR);
+  const ry = CY + R2 * Math.sin(angleR);
+
+  // Lines composite → leaves
+  [[lx, ly], [rx, ry]].forEach(([nx, ny]) => {
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("x1", cx); line.setAttribute("y1", cy);
+    line.setAttribute("x2", nx); line.setAttribute("y2", ny);
+    line.setAttribute("stroke", comp.color);
+    line.setAttribute("stroke-width", "1.5");
+    line.setAttribute("stroke-opacity", "0.35");
+    svg.appendChild(line);
+  });
+
+  // ── Composite node ──────────────────────────────────────────────────────────
+  const compG = document.createElementNS(svgNS, "g");
+
+  // Glow halo
+  const halo = document.createElementNS(svgNS, "ellipse");
+  halo.setAttribute("cx", cx); halo.setAttribute("cy", cy);
+  halo.setAttribute("rx", "76"); halo.setAttribute("ry", "37");
+  halo.setAttribute("fill", "none");
+  halo.setAttribute("stroke", comp.color);
+  halo.setAttribute("stroke-width", "10");
+  halo.setAttribute("stroke-opacity", "0.18");
+  halo.setAttribute("filter", "url(#glow)");
+  compG.appendChild(halo);
+
+  const compEll = document.createElementNS(svgNS, "ellipse");
+  compEll.setAttribute("cx", cx); compEll.setAttribute("cy", cy);
+  compEll.setAttribute("rx", "72"); compEll.setAttribute("ry", "33");
+  compEll.setAttribute("fill", "#1a1f32");
+  compEll.setAttribute("stroke", comp.color);
+  compEll.setAttribute("stroke-width", "2");
+  compEll.setAttribute("filter", "url(#shadow)");
+  compG.appendChild(compEll);
+
+  const nameLines = comp.name.split("\n");
+  const nameLabelY = cy - (nameLines.length > 1 ? 8 : 4);
+  const compLabel = svgText(cx, nameLabelY, nameLines, {
+    "font-size": "11.5", "font-weight": "700", "fill": comp.color, "dy": "1.25em"
+  });
+  compLabel.setAttribute("dominant-baseline", "auto");
+  compG.appendChild(compLabel);
+
+  // Gap badge
+  const badge = gapBadgeInfo(comp.gapChange);
+  if (badge.text) {
+    const badgeY = cy + 22;
+    const badgeW = badge.text === "flipped" ? 52 : 44;
+    const badgeBg = roundedRect(cx, badgeY, badgeW, 14, 4, badge.color, "none", 0.18);
+    compG.appendChild(badgeBg);
+    const badgeBorder = roundedRect(cx, badgeY, badgeW, 14, 4, "none", badge.color, 1);
+    badgeBorder.setAttribute("stroke-width", "1");
+    badgeBorder.setAttribute("fill", "none");
+    badgeBorder.setAttribute("fill-opacity", "0");
+    compG.appendChild(badgeBorder);
+    const badgeLabel = svgText(cx, badgeY, badge.text, {
+      "font-size": "9.5", "font-weight": "700", "fill": badge.color
+    });
+    compG.appendChild(badgeLabel);
+  }
+
+  svg.appendChild(compG);
+
+  // ── Leaf nodes ────────────────────────────────────────────────────────────────
+  [
+    { nx: lx, ny: ly, year: "2020", data: comp.yr2020 },
+    { nx: rx, ny: ry, year: "2023", data: comp.yr2023 }
+  ].forEach(({ nx, ny, year, data }) => {
+    const lc = leafColor(data.d);
+    const isSig = data.sig !== "n.s.";
+    const arrow = leafArrow(data.d);
+    const dStr = formatD(data.d);
+
+    const leafG = document.createElementNS(svgNS, "g");
+    leafG.setAttribute("cursor", "pointer");
+
+    // Leaf glow
+    const leafHalo = document.createElementNS(svgNS, "ellipse");
+    leafHalo.setAttribute("cx", nx); leafHalo.setAttribute("cy", ny);
+    leafHalo.setAttribute("rx", "66"); leafHalo.setAttribute("ry", "34");
+    leafHalo.setAttribute("fill", "none");
+    leafHalo.setAttribute("stroke", lc);
+    leafHalo.setAttribute("stroke-width", "8");
+    leafHalo.setAttribute("stroke-opacity", "0.15");
+    leafHalo.setAttribute("filter", "url(#leafGlow)");
+    leafG.appendChild(leafHalo);
+
+    const leafEll = document.createElementNS(svgNS, "ellipse");
+    leafEll.setAttribute("cx", nx); leafEll.setAttribute("cy", ny);
+    leafEll.setAttribute("rx", "62"); leafEll.setAttribute("ry", "30");
+    leafEll.setAttribute("fill", "#141824");
+    leafEll.setAttribute("stroke", lc);
+    leafEll.setAttribute("stroke-width", isSig ? "1.8" : "1.4");
+    if (!isSig) leafEll.setAttribute("stroke-dasharray", "5 3");
+    leafEll.setAttribute("filter", "url(#shadow)");
+    leafG.appendChild(leafEll);
+
+    // Year label
+    const yearLbl = svgText(nx, ny - 14, year, {
+      "font-size": "9.5", "fill": "#64748b", "font-weight": "600"
+    });
+    leafG.appendChild(yearLbl);
+
+    // d value
+    const dLbl = svgText(nx, ny + 1, `${arrow} d=${dStr}`, {
+      "font-size": "11.5", "font-weight": "700", "fill": lc
+    });
+    leafG.appendChild(dLbl);
+
+    // Sig stars
+    const sigLbl = svgText(nx, ny + 15, data.sig, {
+      "font-size": "9", "fill": "#94a3b8"
+    });
+    leafG.appendChild(sigLbl);
+
+    // Hover events
+    leafG.addEventListener("mousemove", evt => {
+      showTooltip(evt, comp, year, data);
+    });
+    leafG.addEventListener("mouseleave", hideTooltip);
+
+    svg.appendChild(leafG);
+  });
+});
+
+// ── Legend: bottom-left — DIRECTION ──────────────────────────────────────────
+const legendY = 975;
+
+function makeLegendHeader(x, y, text, color="#94a3b8") {
+  const t = document.createElementNS(svgNS, "text");
+  t.setAttribute("x", x); t.setAttribute("y", y);
+  t.setAttribute("font-size", "11"); t.setAttribute("font-weight", "700");
+  t.setAttribute("fill", color); t.setAttribute("letter-spacing", "0.8");
+  t.textContent = text.toUpperCase();
+  return t;
+}
+
+function legendRow(x, y, circleColor, lineType, label) {
+  const g = document.createElementNS(svgNS, "g");
+  const c = document.createElementNS(svgNS, "circle");
+  c.setAttribute("cx", x + 7); c.setAttribute("cy", y);
+  c.setAttribute("r", "5"); c.setAttribute("fill", circleColor);
+  g.appendChild(c);
+  if (lineType) {
+    const l = document.createElementNS(svgNS, "line");
+    l.setAttribute("x1", x + 15); l.setAttribute("y1", y);
+    l.setAttribute("x2", x + 38); l.setAttribute("y2", y);
+    l.setAttribute("stroke", circleColor); l.setAttribute("stroke-width", "1.8");
+    if (lineType === "dashed") l.setAttribute("stroke-dasharray", "4 2");
+    g.appendChild(l);
+  }
+  const t = document.createElementNS(svgNS, "text");
+  t.setAttribute("x", x + 44); t.setAttribute("y", y + 4);
+  t.setAttribute("font-size", "11.5"); t.setAttribute("fill", "#cbd5e1");
+  t.textContent = label;
+  g.appendChild(t);
+  return g;
+}
+
+// Direction legend
+const dirLegG = document.createElementNS(svgNS, "g");
+const dirBg = roundedRect(120, legendY + 48, 260, 118, 8, "#1a1f32", "rgba(255,255,255,0.08)", 1);
+dirBg.setAttribute("stroke-width", "1");
+dirLegG.appendChild(dirBg);
+dirLegG.appendChild(makeLegendHeader(20, legendY + 4, "Direction of Difference"));
+dirLegG.appendChild(legendRow(22, legendY + 26, "#fb923c", "solid", "Estonians score higher (d > 0)"));
+dirLegG.appendChild(legendRow(22, legendY + 46, "#38bdf8", "solid", "Russians score higher (d < 0)"));
+dirLegG.appendChild(legendRow(22, legendY + 68, "#94a3b8", "solid", "Significant (p < .05)"));
+dirLegG.appendChild(legendRow(22, legendY + 88, "#94a3b8", "dashed", "Not significant (n.s.)"));
+svg.appendChild(dirLegG);
+
+// Composite index legend (center)
+const idxX = 340;
+const idxLegG = document.createElementNS(svgNS, "g");
+const idxBg = roundedRect(idxX + 195, legendY + 70, 390, 158, 8, "#1a1f32", "rgba(255,255,255,0.08)", 1);
+idxBg.setAttribute("stroke-width", "1");
+idxLegG.appendChild(idxBg);
+idxLegG.appendChild(makeLegendHeader(idxX, legendY + 4, "Composite Variables"));
+
+composites.forEach((comp, i) => {
+  const row = Math.floor(i / 2);
+  const col = i % 2;
+  const lx = idxX + col * 190;
+  const ly = legendY + 24 + row * 20;
+  const g = document.createElementNS(svgNS, "g");
+  const c = document.createElementNS(svgNS, "circle");
+  c.setAttribute("cx", lx + 7); c.setAttribute("cy", ly);
+  c.setAttribute("r", "5"); c.setAttribute("fill", comp.color);
+  g.appendChild(c);
+  const t = document.createElementNS(svgNS, "text");
+  t.setAttribute("x", lx + 17); t.setAttribute("y", ly + 4);
+  t.setAttribute("font-size", "10.5"); t.setAttribute("fill", "#cbd5e1");
+  t.textContent = `${i+1}. ${comp.name.replace(/\n/g, " ")}`;
+  g.appendChild(t);
+  idxLegG.appendChild(g);
+});
+svg.appendChild(idxLegG);
+
+// Gap change legend (right)
+const gapX = 1300;
+const gapLegG = document.createElementNS(svgNS, "g");
+const gapBg = roundedRect(gapX + 140, legendY + 48, 280, 100, 8, "#1a1f32", "rgba(255,255,255,0.08)", 1);
+gapBg.setAttribute("stroke-width", "1");
+gapLegG.appendChild(gapBg);
+gapLegG.appendChild(makeLegendHeader(gapX, legendY + 4, "Gap Change 2020→2023"));
+
+function gapLegendRow(x, y, text, color, desc) {
+  const g = document.createElementNS(svgNS, "g");
+  const badge = roundedRect(x + 22, y, 50, 14, 4, color, "none", 0.2);
+  g.appendChild(badge);
+  const badgeBord = roundedRect(x + 22, y, 50, 14, 4, "none", color);
+  badgeBord.setAttribute("stroke-width", "1"); badgeBord.setAttribute("fill", "none"); badgeBord.setAttribute("fill-opacity", "0");
+  g.appendChild(badgeBord);
+  const bt = document.createElementNS(svgNS, "text");
+  bt.setAttribute("x", x + 22); bt.setAttribute("y", y + 4);
+  bt.setAttribute("text-anchor", "middle"); bt.setAttribute("font-size", "9.5");
+  bt.setAttribute("font-weight", "700"); bt.setAttribute("fill", color);
+  bt.textContent = text;
+  g.appendChild(bt);
+  const dt = document.createElementNS(svgNS, "text");
+  dt.setAttribute("x", x + 50); dt.setAttribute("y", y + 4);
+  dt.setAttribute("font-size", "11"); dt.setAttribute("fill", "#cbd5e1");
+  dt.textContent = desc;
+  g.appendChild(dt);
+  return g;
+}
+
+gapLegG.appendChild(gapLegendRow(gapX, legendY + 24, "gap ↑", "#f87171", "  Gap widened"));
+gapLegG.appendChild(gapLegendRow(gapX, legendY + 46, "gap ↓", "#34d399", "  Gap narrowed"));
+gapLegG.appendChild(gapLegendRow(gapX, legendY + 68, "flipped", "#c084fc", "Direction reversed"));
+svg.appendChild(gapLegG);
+
+// ── Subtle grid rings ─────────────────────────────────────────────────────────
+[R1, R2].forEach(r => {
+  const ring = document.createElementNS(svgNS, "circle");
+  ring.setAttribute("cx", CX); ring.setAttribute("cy", CY);
+  ring.setAttribute("r", r);
+  ring.setAttribute("fill", "none");
+  ring.setAttribute("stroke", "rgba(255,255,255,0.03)");
+  ring.setAttribute("stroke-width", "1");
+  svg.insertBefore(ring, svg.children[1]);
+});
+</script>
+</body>
+</html>

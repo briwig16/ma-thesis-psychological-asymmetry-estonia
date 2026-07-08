@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EIM Composite Variables — Change 2020 → 2023</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f1117;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    width: 1600px;
+    height: 1150px;
+  }
+  #svg-container {
+    width: 1600px;
+    height: 1150px;
+    position: relative;
+  }
+  #tooltip {
+    position: fixed;
+    background: rgba(15, 17, 23, 0.97);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: #e2e8f0;
+    font-size: 13px;
+    line-height: 1.6;
+    pointer-events: none;
+    display: none;
+    z-index: 9999;
+    max-width: 360px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  }
+  #tooltip .tt-group { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  #tooltip .tt-composite { color: #94a3b8; font-size: 12px; margin-bottom: 8px; }
+  #tooltip .tt-row { display: flex; justify-content: space-between; gap: 16px; }
+  #tooltip .tt-label { color: #94a3b8; }
+  #tooltip .tt-val { font-weight: 600; }
+  #tooltip .tt-note { margin-top: 8px; font-style: italic; color: #cbd5e1; font-size: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; }
+  #tooltip .tt-scale { margin-top: 4px; color: #64748b; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="svg-container">
+  <svg id="mindmap" viewBox="0 0 1600 1150" xmlns="http://www.w3.org/2000/svg" width="1600" height="1150"></svg>
+</div>
+<div id="tooltip"></div>
+
+<script>
+const svg = document.getElementById('mindmap');
+const tooltip = document.getElementById('tooltip');
+
+const NS = 'http://www.w3.org/2000/svg';
+const CX = 800, CY = 520;
+const R1 = 240, R2 = 430;
+const LEAF_OFFSET = 0.17;
+
+// Data — Group Interactions first (greens), Social Connections second (purples)
+const composites = [
+  // ── GROUP INTERACTIONS ──────────────────────────────────────────────────────
+  {
+    group: 'gi',
+    name: "Superordinate\nIdentity",
+    color: "#4ade80",
+    scale: "Higher = stronger sense of belonging to Estonia (scale inverted: 5 − original)",
+    description: "Measures whether respondents feel they belong to and are accepted by Estonian society — capturing flag pride, perceived equality of status, and felt inclusion.",
+    questions: [
+      "Q67_2 — I feel proud when I see the Estonian flag flying",
+      "Q67_4 — I feel like a second-class citizen in Estonian society (reverse-coded)",
+      "Q67_5 — I feel part of Estonian society"
+    ],
+    est: { d: -0.10, sig: "ns",   raw: "3.55 → 3.50", note: "No significant change" },
+    rus: { d: +0.04, sig: "ns",  raw: "2.92 → 2.95", note: "No change" }
+  },
+  {
+    group: 'gi',
+    name: "SD: Primary\nOut-group",
+    color: "#22c55e",
+    scale: "Higher = more social distance from Estonian/Russian speakers",
+    description: "Measures social distance toward the primary ethno-linguistic out-group: Russian speakers (for Estonians) or Estonian speakers (for Russians), across three social contexts.",
+    questions: [
+      "Q57_1/2 — How would you feel about having [Estonian/Russian]-speakers as neighbors?",
+      "Q58_1/2 — ...as colleagues at work or in study?",
+      "Q59_1/2 — ...as a marriage partner for a close family member?"
+    ],
+    est: { d: +0.42, sig: "***", raw: "2.51 → 2.91", note: "Estonians more distant from Russian-speakers" },
+    rus: { d: -0.08, sig: "ns",  raw: "1.90 → 1.83", note: "No change toward Estonian-speakers" }
+  },
+  {
+    group: 'gi',
+    name: "SD: General\nOut-group",
+    color: "#86efac",
+    scale: "Higher = more social distance from other Europeans & non-Europeans",
+    description: "Measures social distance toward general out-groups — other Europeans and people from outside Europe — across the same three social contexts. Ukrainian refugee items excluded due to asymmetric group effects.",
+    questions: [
+      "Q57_4/5 — Feel about having [other Europeans / people from outside Europe] as neighbors?",
+      "Q58_4/5 — ...as colleagues at work or in study?",
+      "Q59_4/5 — ...as a marriage partner for a close family member?"
+    ],
+    est: { d: -0.23, sig: "***", raw: "2.91 → 2.70", note: "More open to general out-groups" },
+    rus: { d: -0.56, sig: "***", raw: "3.12 → 2.60", note: "Much more open — largest shift among Russians" }
+  },
+  {
+    group: 'gi',
+    name: "Contact:\nEstonian Spkrs",
+    color: "#14b8a6",
+    scale: "Higher = more frequent contact with Estonian speakers (scale inverted: 6 − original)",
+    description: "Measures how frequently respondents interact with Estonian-speaking people across six everyday social contexts. For Russian speakers this captures cross-group contact; for Estonians it captures in-group contact.",
+    questions: [
+      "Q51_1 — At work or in study",
+      "Q51_2 — In your neighborhood",
+      "Q51_3 — Among friends",
+      "Q51_4 — In shops or while using services",
+      "Q51_5 — During leisure activities",
+      "Q51_6 — Online or on social media"
+    ],
+    est: { d: +0.12, sig: "ns",  raw: "4.15 → 4.26", note: "No change in contact with Estonian-speakers" },
+    rus: { d: +0.51, sig: "***", raw: "2.14 → 2.71", note: "Much more contact with Estonian-speakers — largest Russian shift" }
+  },
+  {
+    group: 'gi',
+    name: "Contact:\nRussian Spkrs",
+    color: "#6ee7b7",
+    scale: "Higher = more frequent contact with Russian speakers (scale inverted: 6 − original)",
+    description: "Measures how frequently respondents interact with Russian-speaking people across the same six everyday social contexts. For Estonians this captures cross-group contact; for Russians it captures in-group contact.",
+    questions: [
+      "Q52_1 — At work or in study",
+      "Q52_2 — In your neighborhood",
+      "Q52_3 — Among friends",
+      "Q52_4 — In shops or while using services",
+      "Q52_5 — During leisure activities",
+      "Q52_6 — Online or on social media"
+    ],
+    est: { d: +0.10, sig: "*",  raw: "2.02 → 2.13", note: "Slightly more contact with Russian-speakers" },
+    rus: { d: +0.09, sig: "ns",  raw: "4.21 → 4.29", note: "No change in contact with Russian-speakers" }
+  },
+  // ── SOCIAL CONNECTIONS ──────────────────────────────────────────────────────
+  {
+    group: 'sc',
+    name: "Comp. Opp.\nAssessment",
+    color: "#c084fc",
+    scale: "Higher = perceives greater Estonian structural advantage (scale inverted: 5 − original)",
+    description: "NOTE: This question asks whether opportunities are BETTER FOR ESTONIANS or better for other nationalities — it is NOT a general satisfaction rating. A higher score means the respondent perceives Estonians as having a structural advantage in that domain. Russians score notably higher than Estonians on this scale (2020: Rus 2.86 vs Est 2.44; 2023: Rus 2.68 vs Est 2.29), meaning Russians perceive a clear Estonian structural advantage that Estonians themselves do not fully acknowledge. Both groups shifted toward perceiving more equal conditions between 2020 and 2023, but the gap persists.",
+    questions: [
+      "Q44_1 — Material well-being",
+      "Q44_2 — Cultural participation",
+      "Q44_3 — Education",
+      "Q44_4 — Social & political participation",
+      "Q44_5 — Entrepreneurship",
+      "Q44_6 — Career & jobs",
+      "Q44_7 — Medical care",
+      "Q44_8 — Housing",
+      "Q44_9 — Leisure & holidays",
+      "Q44_10 — Opportunities for children & youth",
+      "Q44_11 — Sports & exercise",
+      "Q44_12 — State benefits & services"
+    ],
+    est: { d: -0.30, sig: "***", raw: "2.44 → 2.29", note: "Perceive conditions as slightly more equal in 2023 — but score lower than Russians throughout, indicating Estonians see less of their own structural advantage" },
+    rus: { d: -0.34, sig: "***", raw: "2.86 → 2.68", note: "Moved toward perceiving greater equality in 2023, but still score higher than Estonians — Russians consistently perceive a clearer Estonian structural advantage across domains" }
+  },
+  {
+    group: 'sc',
+    name: "Belief in\nInevitable Conflict",
+    color: "#a855f7",
+    scale: "Higher = stronger belief in ethnic conflict",
+    description: "Measures the degree to which respondents believe ethnic and cultural differences in Estonia inevitably produce social conflict and division rather than cooperation.",
+    questions: [
+      "Q63_1 — Conflicts between ethnic groups in Estonia are inevitable",
+      "Q63_2 — Intercultural differences divide Estonian society",
+      "Q63_3 — Different ethnic groups can cooperate in Estonia (reverse-coded)",
+      "Q63_4 — People from other countries enrich Estonian cultural life (reverse-coded)"
+    ],
+    est: { d: -0.09, sig: "ns",  raw: "2.78 → 2.72", note: "No change" },
+    rus: { d: +0.32, sig: "***", raw: "3.03 → 3.21", note: "Stronger belief in ethnic conflict" }
+  },
+  {
+    group: 'sc',
+    name: "Minority Support\nInclusion",
+    color: "#e879f9",
+    scale: "Higher = stronger support for minority inclusion in governance (scale inverted: 5 − original)",
+    description: "Measures support for the meaningful participation of non-Estonian residents in Estonia's economic and political decision-making.",
+    questions: [
+      "Q68_1 — Involving people of non-Estonian origin in the Estonian economy is beneficial",
+      "Q68_2 — Involving people of non-Estonian origin in governance is beneficial",
+      "Q68_3 — The opinions and needs of non-Estonian residents should be better understood"
+    ],
+    est: { d: -0.15, sig: "**",  raw: "2.79 → 2.67", note: "Slightly less supportive of minority inclusion" },
+    rus: { d: +0.04, sig: "ns",  raw: "3.43 → 3.46", note: "No change" }
+  }
+];
+
+function getChangeColor(d, sig) {
+  if (sig === "ns") return "#6b7280";
+  return d > 0 ? "#f87171" : "#34d399";
+}
+
+function getArrow(d, sig) {
+  if (sig === "ns") return "→";
+  return d > 0 ? "↑" : "↓";
+}
+
+function el(tag, attrs = {}) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+
+function mkDefs() {
+  const defs = el('defs');
+
+  // Radial gradient for background
+  const bgGrad = el('radialGradient', { id: 'bgGrad', cx: '50%', cy: '50%', r: '70%' });
+  const s1 = el('stop'); s1.setAttribute('offset', '0%'); s1.setAttribute('stop-color', '#161b27');
+  const s2 = el('stop'); s2.setAttribute('offset', '100%'); s2.setAttribute('stop-color', '#0a0c12');
+  bgGrad.appendChild(s1); bgGrad.appendChild(s2);
+  defs.appendChild(bgGrad);
+
+  // Center node gradient
+  const cGrad = el('radialGradient', { id: 'centerGrad', cx: '50%', cy: '30%', r: '70%' });
+  const cs1 = el('stop'); cs1.setAttribute('offset', '0%'); cs1.setAttribute('stop-color', '#334155');
+  const cs2 = el('stop'); cs2.setAttribute('offset', '100%'); cs2.setAttribute('stop-color', '#1e293b');
+  cGrad.appendChild(cs1); cGrad.appendChild(cs2);
+  defs.appendChild(cGrad);
+
+  // Glow filter
+  const filter = el('filter', { id: 'glow', x: '-30%', y: '-30%', width: '160%', height: '160%' });
+  const blur = el('feGaussianBlur', { stdDeviation: '3', result: 'coloredBlur' });
+  const merge = el('feMerge');
+  const mn1 = el('feMergeNode'); mn1.setAttribute('in', 'coloredBlur');
+  const mn2 = el('feMergeNode'); mn2.setAttribute('in', 'SourceGraphic');
+  merge.appendChild(mn1); merge.appendChild(mn2);
+  filter.appendChild(blur); filter.appendChild(merge);
+  defs.appendChild(filter);
+
+  // Subtle glow for leaf
+  const leafFilter = el('filter', { id: 'leafGlow', x: '-20%', y: '-20%', width: '140%', height: '140%' });
+  const leafBlur = el('feGaussianBlur', { stdDeviation: '2', result: 'coloredBlur' });
+  const leafMerge = el('feMerge');
+  const lm1 = el('feMergeNode'); lm1.setAttribute('in', 'coloredBlur');
+  const lm2 = el('feMergeNode'); lm2.setAttribute('in', 'SourceGraphic');
+  leafMerge.appendChild(lm1); leafMerge.appendChild(lm2);
+  leafFilter.appendChild(leafBlur); leafFilter.appendChild(leafMerge);
+  defs.appendChild(leafFilter);
+
+  // Drop shadow
+  const shadow = el('filter', { id: 'shadow', x: '-10%', y: '-10%', width: '120%', height: '120%' });
+  const shadowBlur = el('feDropShadow', { dx: '0', dy: '4', stdDeviation: '6', 'flood-color': 'rgba(0,0,0,0.5)' });
+  shadow.appendChild(shadowBlur);
+  defs.appendChild(shadow);
+
+  svg.appendChild(defs);
+}
+
+function mkBackground() {
+  const bg = el('rect', { x: 0, y: 0, width: 1600, height: 1150, fill: 'url(#bgGrad)' });
+  svg.appendChild(bg);
+
+  // Subtle grid
+  for (let i = 0; i < 1600; i += 80) {
+    const line = el('line', { x1: i, y1: 0, x2: i, y2: 1020, stroke: 'rgba(255,255,255,0.02)', 'stroke-width': 1 });
+    svg.appendChild(line);
+  }
+  for (let i = 0; i < 1150; i += 80) {
+    const line = el('line', { x1: 0, y1: i, x2: 1600, y2: i, stroke: 'rgba(255,255,255,0.02)', 'stroke-width': 1 });
+    svg.appendChild(line);
+  }
+
+  // Faint concentric circles
+  [R1, R2, R2 + 80].forEach(r => {
+    const circle = el('circle', { cx: CX, cy: CY, r, fill: 'none', stroke: 'rgba(255,255,255,0.03)', 'stroke-width': 1, 'stroke-dasharray': '4 8' });
+    svg.appendChild(circle);
+  });
+}
+
+function mkTitle() {
+  const titleG = el('g');
+  const title = el('text', { x: 800, y: 44, 'text-anchor': 'middle', fill: '#f1f5f9', 'font-size': '22', 'font-weight': '700', 'letter-spacing': '0.5' });
+  title.textContent = 'EIM Composite Variables — Change 2020 → 2023';
+  titleG.appendChild(title);
+
+  const sub = el('text', { x: 800, y: 68, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '13', 'letter-spacing': '0.3' });
+  sub.textContent = "Estonian Integration Monitor  |  Within-Group Change  |  Welch's t-test  |  Cohen's d";
+  titleG.appendChild(sub);
+
+  svg.appendChild(titleG);
+}
+
+function mkCenterNode() {
+  const g = el('g');
+
+  // Outer ring
+  const ring = el('ellipse', { cx: CX, cy: CY, rx: 78, ry: 52, fill: 'none', stroke: 'rgba(148,163,184,0.25)', 'stroke-width': 2, 'stroke-dasharray': '6 4' });
+  g.appendChild(ring);
+
+  // Main ellipse
+  const body = el('ellipse', { cx: CX, cy: CY, rx: 72, ry: 46, fill: 'url(#centerGrad)', stroke: '#475569', 'stroke-width': 2, filter: 'url(#shadow)' });
+  g.appendChild(body);
+
+  const lines = ["EIM", "2020 → 2023", "Within-Group", "Change"];
+  const offsets = [-18, -4, 10, 24];
+  lines.forEach((line, i) => {
+    const t = el('text', { x: CX, y: CY + offsets[i], 'text-anchor': 'middle', fill: i === 0 ? '#f1f5f9' : '#cbd5e1', 'font-size': i === 0 ? '14' : '11', 'font-weight': i === 0 ? '700' : '500' });
+    t.textContent = line;
+    g.appendChild(t);
+  });
+
+  svg.appendChild(g);
+}
+
+function quadBezier(x1, y1, x2, y2, curvature = 0.3) {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const nx = -dy / len, ny = dx / len;
+  const cx = mx + nx * curvature * len * 0.4;
+  const cy = my + ny * curvature * len * 0.4;
+  return `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
+}
+
+function mkLeaf(compX, compY, leafX, leafY, group, comp, data, color, compName) {
+  const g = el('g', { class: 'leaf-node', style: 'cursor:pointer' });
+  const changeColor = getChangeColor(data.d, data.sig);
+  const arrow = getArrow(data.d, data.sig);
+
+  // Connecting line from composite to leaf
+  const line = el('line', {
+    x1: compX, y1: compY,
+    x2: leafX, y2: leafY,
+    stroke: changeColor,
+    'stroke-width': 1.5,
+    'stroke-opacity': 0.5,
+    'stroke-dasharray': data.sig === 'ns' ? '4 4' : 'none'
+  });
+  g.appendChild(line);
+
+  // Glow circle behind leaf for significant changes
+  if (data.sig !== 'ns') {
+    const glow = el('ellipse', { cx: leafX, cy: leafY, rx: 58, ry: 28, fill: changeColor, 'fill-opacity': 0.08 });
+    g.appendChild(glow);
+  }
+
+  // Leaf ellipse
+  const leaf = el('ellipse', {
+    cx: leafX, cy: leafY, rx: 52, ry: 24,
+    fill: 'rgba(15,17,23,0.92)',
+    stroke: changeColor,
+    'stroke-width': data.sig !== 'ns' ? 2 : 1.2,
+    filter: data.sig !== 'ns' ? 'url(#leafGlow)' : 'none'
+  });
+  g.appendChild(leaf);
+
+  // Group label
+  const grpLabel = el('text', { x: leafX, y: leafY - 9, 'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '9', 'font-weight': '600', 'letter-spacing': '0.8' });
+  grpLabel.textContent = group.toUpperCase();
+  g.appendChild(grpLabel);
+
+  // Arrow + d value
+  const dText = el('text', { x: leafX, y: leafY + 3, 'text-anchor': 'middle', fill: changeColor, 'font-size': '12', 'font-weight': '700' });
+  dText.textContent = `${arrow} d=${data.d > 0 ? '+' : ''}${data.d.toFixed(2)}`;
+  g.appendChild(dText);
+
+  // Significance stars
+  const sigText = el('text', { x: leafX, y: leafY + 15, 'text-anchor': 'middle', fill: changeColor, 'font-size': '10', 'font-weight': '600' });
+  sigText.textContent = data.sig === 'ns' ? 'n.s.' : data.sig;
+  g.appendChild(sigText);
+
+  // Tooltip interactivity
+  g.addEventListener('mouseenter', (e) => {
+    const cleanName = compName.replace(/\n/g, ' ');
+    tooltip.innerHTML = `
+      <div class="tt-group" style="color:${changeColor}">${group} Speakers ${arrow}</div>
+      <div class="tt-composite">${cleanName}</div>
+      <div class="tt-row"><span class="tt-label">Cohen's d:</span><span class="tt-val" style="color:${changeColor}">${data.d > 0 ? '+' : ''}${data.d.toFixed(2)} ${data.sig}</span></div>
+      <div class="tt-row"><span class="tt-label">Raw means:</span><span class="tt-val">${data.raw}</span></div>
+      <div class="tt-note">${data.note}</div>
+      <div class="tt-scale">${comp.scale}</div>
+    `;
+    tooltip.style.display = 'block';
+  });
+  g.addEventListener('mousemove', (e) => {
+    let tx = e.clientX + 16, ty = e.clientY - 10;
+    if (tx + 310 > window.innerWidth) tx = e.clientX - 326;
+    if (ty + 180 > window.innerHeight) ty = e.clientY - 180;
+    tooltip.style.left = tx + 'px';
+    tooltip.style.top = ty + 'px';
+  });
+  g.addEventListener('mouseleave', () => {
+    tooltip.style.display = 'none';
+  });
+
+  svg.appendChild(g);
+}
+
+function mkComposite(comp, angle, index) {
+  const cx = CX + R1 * Math.cos(angle);
+  const cy = CY + R1 * Math.sin(angle);
+
+  // Leaf positions
+  const estAngle = angle - LEAF_OFFSET;
+  const rusAngle = angle + LEAF_OFFSET;
+  const lx_est = CX + R2 * Math.cos(estAngle);
+  const ly_est = CY + R2 * Math.sin(estAngle);
+  const lx_rus = CX + R2 * Math.cos(rusAngle);
+  const ly_rus = CY + R2 * Math.sin(rusAngle);
+
+  // Bezier from center to composite
+  const pathD = quadBezier(CX, CY, cx, cy, 0.25);
+  const centerPath = el('path', {
+    d: pathD,
+    fill: 'none',
+    stroke: comp.color,
+    'stroke-width': 2,
+    'stroke-opacity': 0.4
+  });
+  svg.appendChild(centerPath);
+
+  // Draw leaf nodes first (so composite is on top)
+  mkLeaf(cx, cy, lx_est, ly_est, 'Estonian', comp, comp.est, comp.color, comp.name);
+  mkLeaf(cx, cy, lx_rus, ly_rus, 'Russian', comp, comp.rus, comp.color, comp.name);
+
+  // Composite node group
+  const g = el('g', { style: 'cursor:pointer' });
+
+  // Glow
+  const glow = el('ellipse', { cx, cy, rx: 80, ry: 40, fill: comp.color, 'fill-opacity': 0.06 });
+  g.appendChild(glow);
+
+  // Ellipse
+  const body = el('ellipse', {
+    cx, cy, rx: 72, ry: 33,
+    fill: 'rgba(15,17,23,0.95)',
+    stroke: comp.color,
+    'stroke-width': 2,
+    filter: 'url(#glow)'
+  });
+  g.appendChild(body);
+
+  // Label lines
+  const nameLines = comp.name.split('\n');
+  const lineHeight = 13;
+  const totalH = (nameLines.length - 1) * lineHeight;
+  nameLines.forEach((line, i) => {
+    const t = el('text', {
+      x: cx,
+      y: cy - totalH / 2 + i * lineHeight + 4,
+      'text-anchor': 'middle',
+      fill: comp.color,
+      'font-size': '11',
+      'font-weight': '700',
+      'letter-spacing': '0.2'
+    });
+    t.textContent = line;
+    g.appendChild(t);
+  });
+
+  // Index number badge
+  const badge = el('circle', { cx: cx + 66, cy: cy - 27, r: 9, fill: comp.color, 'fill-opacity': 0.25, stroke: comp.color, 'stroke-width': 1 });
+  g.appendChild(badge);
+  const badgeText = el('text', { x: cx + 66, y: cy - 23, 'text-anchor': 'middle', fill: comp.color, 'font-size': '9', 'font-weight': '700' });
+  badgeText.textContent = index + 1;
+  g.appendChild(badgeText);
+
+  // Composite node tooltip
+  g.addEventListener('mouseenter', () => {
+    const qList = comp.questions.map(q => `<li style="margin-bottom:4px">${q}</li>`).join('');
+    tooltip.innerHTML = `
+      <div class="tt-group" style="color:${comp.color}">${comp.name.replace('\n', ' ')}</div>
+      <div class="tt-composite" style="color:#94a3b8;font-size:11px;margin-bottom:6px">${comp.scale}</div>
+      <div style="color:#cbd5e1;font-size:12px;line-height:1.55;margin-bottom:10px">${comp.description}</div>
+      <div style="color:#64748b;font-size:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:5px">SURVEY ITEMS</div>
+      <ul style="margin:0;padding-left:14px;color:#94a3b8;font-size:11px;line-height:1.5">${qList}</ul>
+    `;
+    tooltip.style.display = 'block';
+  });
+  g.addEventListener('mousemove', (e) => {
+    let tx = e.clientX + 16, ty = e.clientY - 10;
+    if (tx + 340 > window.innerWidth) tx = e.clientX - 356;
+    if (ty + 400 > window.innerHeight) ty = e.clientY - 400;
+    tooltip.style.left = tx + 'px';
+    tooltip.style.top = ty + 'px';
+  });
+  g.addEventListener('mouseleave', () => {
+    tooltip.style.display = 'none';
+  });
+
+  svg.appendChild(g);
+}
+
+function mkLegend() {
+  const gx = 32, gy = 975;
+  const g = el('g');
+
+  // Background
+  const bg = el('rect', { x: gx - 12, y: gy - 24, width: 260, height: 122, rx: 10, fill: 'rgba(15,17,23,0.9)', stroke: 'rgba(255,255,255,0.08)', 'stroke-width': 1 });
+  g.appendChild(bg);
+
+  const title = el('text', { x: gx, y: gy - 6, fill: '#94a3b8', 'font-size': '11', 'font-weight': '700', 'letter-spacing': '1' });
+  title.textContent = 'CHANGE DIRECTION & SIGNIFICANCE';
+  g.appendChild(title);
+
+  const items = [
+    { color: '#f87171', label: 'Significant increase (d > 0)', arrow: '↑' },
+    { color: '#34d399', label: 'Significant decrease (d < 0)', arrow: '↓' },
+    { color: '#6b7280', label: 'Not significant (n.s.)', arrow: '→' }
+  ];
+
+  items.forEach((item, i) => {
+    const y = gy + 12 + i * 22;
+    const dot = el('ellipse', { cx: gx + 10, cy: y - 5, rx: 14, ry: 9, fill: 'rgba(15,17,23,0.9)', stroke: item.color, 'stroke-width': 1.5 });
+    g.appendChild(dot);
+    const arrowT = el('text', { x: gx + 10, y: y - 1, 'text-anchor': 'middle', fill: item.color, 'font-size': '10', 'font-weight': '700' });
+    arrowT.textContent = item.arrow;
+    g.appendChild(arrowT);
+    const lbl = el('text', { x: gx + 30, y: y - 1, fill: '#cbd5e1', 'font-size': '12' });
+    lbl.textContent = item.label;
+    g.appendChild(lbl);
+  });
+
+  // Sig key
+  const sigY = gy + 80;
+  const sigItems = ['* p<.05', '** p<.01', '*** p<.001'];
+  const sigTitle = el('text', { x: gx, y: sigY - 2, fill: '#64748b', 'font-size': '11', 'font-weight': '600' });
+  sigTitle.textContent = 'Significance:';
+  g.appendChild(sigTitle);
+  sigItems.forEach((s, i) => {
+    const st = el('text', { x: gx + 90 + i * 72, y: sigY - 2, fill: '#94a3b8', 'font-size': '11', 'font-weight': '600' });
+    st.textContent = s;
+    g.appendChild(st);
+  });
+
+  svg.appendChild(g);
+}
+
+function mkGroupLegend() {
+  const gx = 1290, gy = 975;
+  const g = el('g');
+
+  const bg = el('rect', { x: gx - 12, y: gy - 24, width: 298, height: 96, rx: 10, fill: 'rgba(15,17,23,0.9)', stroke: 'rgba(255,255,255,0.08)', 'stroke-width': 1 });
+  g.appendChild(bg);
+
+  const title = el('text', { x: gx, y: gy - 6, fill: '#94a3b8', 'font-size': '11', 'font-weight': '700', 'letter-spacing': '1' });
+  title.textContent = 'LEAF LAYOUT';
+  g.appendChild(title);
+
+  const items = [
+    { label: 'Upper/Left leaf: Estonian speakers', icon: 'ET' },
+    { label: 'Lower/Right leaf: Russian speakers', icon: 'RU' }
+  ];
+  items.forEach((item, i) => {
+    const y = gy + 14 + i * 24;
+    const dot = el('ellipse', { cx: gx + 14, cy: y - 6, rx: 16, ry: 10, fill: 'rgba(15,17,23,0.9)', stroke: '#475569', 'stroke-width': 1.5 });
+    g.appendChild(dot);
+    const iconT = el('text', { x: gx + 14, y: y - 2, 'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '8', 'font-weight': '700' });
+    iconT.textContent = item.icon;
+    g.appendChild(iconT);
+    const lbl = el('text', { x: gx + 36, y: y - 2, fill: '#cbd5e1', 'font-size': '12' });
+    lbl.textContent = item.label;
+    g.appendChild(lbl);
+  });
+
+  const noteY = gy + 62;
+  const note = el('text', { x: gx, y: noteY, fill: '#475569', 'font-size': '11', 'font-style': 'italic' });
+  note.textContent = 'Hover leaf nodes for detailed statistics';
+  g.appendChild(note);
+
+  svg.appendChild(g);
+}
+
+function mkCompositeKey() {
+  // Sits between the left legend (ends ~x=292) and right legend (starts ~x=1278)
+  const startX = 308, startY = 987;
+  const giColW = 192;
+  const giCols = 3;
+  const giItems = composites.filter(c => c.group === 'gi');
+  const scItems = composites.filter(c => c.group === 'sc');
+  const divX = startX + giCols * giColW + 10;
+  const scX  = divX + 16;
+  const totalW = scX + 220 - (startX - 12);
+
+  const g = el('g');
+  const bg = el('rect', { x: startX - 12, y: startY - 24, width: totalW, height: 108, rx: 10, fill: 'rgba(15,17,23,0.9)', stroke: 'rgba(255,255,255,0.08)', 'stroke-width': 1 });
+  g.appendChild(bg);
+
+  // ── Group Interactions ──
+  const giColor = '#22c55e';
+  const giH = el('text', { x: startX, y: startY - 6, fill: giColor, 'font-size': '10', 'font-weight': '700', 'letter-spacing': '1.2' });
+  giH.textContent = 'GROUP INTERACTIONS';
+  g.appendChild(giH);
+
+  giItems.forEach((comp, i) => {
+    const col = i % giCols, row = Math.floor(i / giCols);
+    const x = startX + col * giColW, y = startY + 14 + row * 24;
+    const dot = el('circle', { cx: x + 6, cy: y - 6, r: 5, fill: comp.color, 'fill-opacity': 0.35, stroke: comp.color, 'stroke-width': 1.5 });
+    g.appendChild(dot);
+    const num = el('text', { x: x + 6, y: y - 2, 'text-anchor': 'middle', fill: comp.color, 'font-size': '8', 'font-weight': '700' });
+    num.textContent = composites.indexOf(comp) + 1;
+    g.appendChild(num);
+    const lbl = el('text', { x: x + 18, y: y - 2, fill: '#cbd5e1', 'font-size': '11' });
+    lbl.textContent = comp.name.replace('\n', ' ');
+    g.appendChild(lbl);
+  });
+
+  // Divider
+  const div = el('line', { x1: divX, y1: startY - 20, x2: divX, y2: startY + 78, stroke: 'rgba(255,255,255,0.1)', 'stroke-width': 1 });
+  g.appendChild(div);
+
+  // ── Social Connections ──
+  const scColor = '#a855f7';
+  const scH = el('text', { x: scX, y: startY - 6, fill: scColor, 'font-size': '10', 'font-weight': '700', 'letter-spacing': '1.2' });
+  scH.textContent = 'SOCIAL CONNECTIONS';
+  g.appendChild(scH);
+
+  scItems.forEach((comp, i) => {
+    const y = startY + 14 + i * 24;
+    const dot = el('circle', { cx: scX + 6, cy: y - 6, r: 5, fill: comp.color, 'fill-opacity': 0.35, stroke: comp.color, 'stroke-width': 1.5 });
+    g.appendChild(dot);
+    const num = el('text', { x: scX + 6, y: y - 2, 'text-anchor': 'middle', fill: comp.color, 'font-size': '8', 'font-weight': '700' });
+    num.textContent = composites.indexOf(comp) + 1;
+    g.appendChild(num);
+    const lbl = el('text', { x: scX + 18, y: y - 2, fill: '#cbd5e1', 'font-size': '11' });
+    lbl.textContent = comp.name.replace('\n', ' ');
+    g.appendChild(lbl);
+  });
+
+  svg.appendChild(g);
+}
+
+// Uniform 45° spacing — GI occupies top-right arc, SC occupies bottom-left arc
+// Gaps between groups are equal to within-group spacing (no cramping at boundaries)
+const groupedAngles = [
+  -90, -45, 0, 45, 90,   // Group Interactions (top → right → lower-right)
+  135, 180, 225           // Social Connections (lower-left → left → upper-left)
+].map(d => d * Math.PI / 180);
+
+function mkGroupArcs() {
+  const RARC = 498;
+  const RTXT  = 526;
+  // GI: -90° to 90°, midpoint 0° (right side) | SC: 135° to 225°, midpoint 180° (left side)
+  // Sector boundaries sit at the midpoints between adjacent groups (±22.5° from boundary nodes)
+  const groups = [
+    { label: 'GROUP INTERACTIONS', color: '#22c55e', startDeg: -112, endDeg: 112, midDeg: 0 },
+    { label: 'SOCIAL CONNECTIONS', color: '#a855f7', startDeg: 113,  endDeg: 248, midDeg: 180 }
+  ];
+  groups.forEach(grp => {
+    const toRad = d => d * Math.PI / 180;
+    const x1 = CX + RARC * Math.cos(toRad(grp.startDeg));
+    const y1 = CY + RARC * Math.sin(toRad(grp.startDeg));
+    const x2 = CX + RARC * Math.cos(toRad(grp.endDeg));
+    const y2 = CY + RARC * Math.sin(toRad(grp.endDeg));
+    const span = grp.endDeg - grp.startDeg;
+    const largeArc = span > 180 ? 1 : 0;
+
+    // Filled sector background
+    const sector = el('path', {
+      d: `M ${CX} ${CY} L ${x1} ${y1} A ${RARC} ${RARC} 0 ${largeArc} 1 ${x2} ${y2} Z`,
+      fill: grp.color,
+      'fill-opacity': '0.04',
+      stroke: 'none'
+    });
+    svg.insertBefore(sector, svg.firstChild.nextSibling); // behind everything except bg
+
+    // Dashed arc stroke
+    const arc = el('path', {
+      d: `M ${x1} ${y1} A ${RARC} ${RARC} 0 ${largeArc} 1 ${x2} ${y2}`,
+      fill: 'none',
+      stroke: grp.color,
+      'stroke-width': '1.5',
+      'stroke-opacity': '0.35',
+      'stroke-dasharray': '5 5'
+    });
+    svg.appendChild(arc);
+
+    // Group label at arc midpoint
+    const mx = CX + RTXT * Math.cos(toRad(grp.midDeg));
+    const my = CY + RTXT * Math.sin(toRad(grp.midDeg));
+    const lbl = el('text', {
+      x: mx, y: my,
+      'text-anchor': 'middle',
+      'dominant-baseline': 'middle',
+      fill: grp.color,
+      'font-size': '11',
+      'font-weight': '700',
+      'letter-spacing': '1.8',
+      'fill-opacity': '0.75'
+    });
+    lbl.textContent = grp.label;
+    svg.appendChild(lbl);
+  });
+}
+
+// Build the mind map
+mkDefs();
+mkBackground();
+mkTitle();
+mkCenterNode();
+mkGroupArcs();
+
+composites.forEach((comp, i) => {
+  mkComposite(comp, groupedAngles[i], i);
+});
+
+mkLegend();
+mkGroupLegend();
+mkCompositeKey();
+
+// Footer
+const footer = el('text', { x: 800, y: 1138, 'text-anchor': 'middle', fill: '#1e293b', 'font-size': '10' });
+footer.textContent = 'Estonian Integration Monitor (EIM) — Comparative Analysis 2020–2023 | Within-Group Change via Welch\'s t-test & Cohen\'s d';
+svg.appendChild(footer);
+</script>
+</body>
+</html>

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EIM — Estonian vs Russian Radar 2020 & 2023</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0a0c12; display:flex; justify-content:center; padding:36px 24px 48px; font-family:'Segoe UI',system-ui,sans-serif; }
+#wrap { width:1400px; }
+svg { display:block; }
+#tooltip {
+  position:fixed; display:none;
+  background:rgba(12,14,20,0.97); border:1px solid rgba(255,255,255,0.13);
+  border-radius:10px; padding:13px 16px; pointer-events:none; max-width:320px;
+  box-shadow:0 6px 28px rgba(0,0,0,0.6); z-index:100;
+  font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; color:#cbd5e1; line-height:1.6;
+}
+#tooltip .tt-title { font-size:13px; font-weight:700; margin-bottom:6px; }
+#tooltip .tt-desc { font-size:11px; color:#94a3b8; margin-bottom:6px; }
+#tooltip .tt-divider { border-top:1px solid rgba(255,255,255,0.08); margin:7px 0; }
+#tooltip .tt-row { display:flex; justify-content:space-between; gap:20px; font-size:11.5px; margin-bottom:3px; }
+#tooltip .tt-label { color:#64748b; }
+#tooltip .tt-val { font-weight:600; }
+#tooltip .tt-note { font-size:10.5px; color:#64748b; font-style:italic; margin-top:4px; }
+</style>
+</head>
+<body>
+<div id="wrap"><svg id="chart" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div id="tooltip"></div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('chart');
+const tooltip = document.getElementById('tooltip');
+
+// ── Layout ──────────────────────────────────────────────────────────────────
+const W = 1500, H = 780;
+const R = 195; // max radius per chart
+const HEADER_H = 130; // space for title + legend
+const CY = HEADER_H + R + 70; // vertical center of radars
+const CX_LEFT  = W * 0.25;    // center of left radar
+const CX_RIGHT = W * 0.75;    // center of right radar
+
+svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+svg.setAttribute('width', W);
+svg.setAttribute('height', H);
+
+const EST = '#60a5fa';
+const RUS = '#facc15';
+
+// ── Data ────────────────────────────────────────────────────────────────────
+const data = [
+  {
+    name:'Contact:\nOut-group', group:'gi',
+    scaleMin:1, scaleMax:5,
+    est20:2.02, rus20:2.14, est23:2.13, rus23:2.71,
+    note:'Higher = more frequent contact with out-group (inverted)',
+    description:'Contact with the primary out-group: for Estonians, contact with Russian speakers; for Russians, contact with Estonian speakers. Combined here to show each group\'s cross-group contact.',
+  },
+  {
+    name:'Social Distance:\nPrimary Out-group', group:'gi',
+    scaleMin:1, scaleMax:5,
+    est20:2.51, rus20:1.90, est23:2.91, rus23:1.83,
+    note:'Higher = more preferred social distance toward the primary out-group',
+    description:'Measures preferred social distance from the primary ethno-linguistic out-group across three social contexts.',
+  },
+  {
+    name:'Social Distance:\nGeneral Out-group', group:'gi',
+    scaleMin:1, scaleMax:5,
+    est20:2.91, rus20:3.12, est23:2.70, rus23:2.60,
+    note:'Higher = more preferred social distance toward Europeans & non-Europeans',
+    description:'Measures preferred social distance from general out-groups — other Europeans and non-Europeans — across three social contexts.',
+  },
+  {
+    name:'Superordinate\nIdentity', group:'gi',
+    scaleMin:1, scaleMax:4,
+    est20:3.55, rus20:2.92, est23:3.50, rus23:2.95,
+    note:'Higher = stronger sense of belonging to Estonia (inverted)',
+    description:'Measures whether respondents feel they belong to and are accepted by Estonian society.',
+  },
+  {
+    name:'Group ID\nPatterns', group:'gi',
+    scaleMin:1, scaleMax:5,
+    est20:2.95, rus20:2.69, est23:2.94, rus23:2.81,
+    note:'Higher = identifies more with Estonian people than own ethnic group',
+    description:'Single item measuring dual identity: 1 = only own nationality, 3 = equally both, 5 = only Estonian people.',
+  },
+  {
+    name:'Territorial\nAttachment', group:'sc',
+    scaleMin:1, scaleMax:4,
+    est20:3.76, rus20:3.57, est23:3.77, rus23:3.73,
+    note:'Higher = stronger feeling of being at home in Estonia (inverted)',
+    description:'Single item: "You feel more at home in Estonia than anywhere else in the world." Inverted so higher = stronger attachment.',
+  },
+  {
+    name:'Minority Support\nInclusion', group:'sc',
+    scaleMin:1, scaleMax:4,
+    est20:2.79, rus20:3.43, est23:2.67, rus23:3.46,
+    note:'Higher = stronger support for minority inclusion in governance (inverted)',
+    description:'Measures support for meaningful participation of non-Estonian residents in economic and political decision-making.',
+  },
+  {
+    name:'Belief in\nInevitable Conflict', group:'sc',
+    scaleMin:1, scaleMax:5,
+    est20:2.78, rus20:3.03, est23:2.72, rus23:3.21,
+    note:'Higher = stronger belief that ethnic conflict is inevitable',
+    description:'Measures the degree to which respondents believe ethnic differences inevitably produce social conflict.',
+  },
+  {
+    name:'Comparative\nOpportunity Assessment', group:'sc',
+    scaleMin:1, scaleMax:4,
+    est20:2.44, rus20:2.86, est23:2.29, rus23:2.68,
+    note:'Higher = perceives greater Estonian structural advantage (inverted)',
+    description:'Asks whether opportunities are better for Estonians or other nationalities — a higher score means perceiving Estonians as having structural advantage.',
+  }
+];
+
+const N = data.length;
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function norm(val, d) { return (val - d.scaleMin) / (d.scaleMax - d.scaleMin); }
+function angle(i) { return (Math.PI * 2 * i / N) - Math.PI / 2; }
+function pt(cx, cy, i, normVal) {
+  const a = angle(i);
+  const r = normVal * R;
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+}
+function el(tag, attrs={}, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+// ── Background ──────────────────────────────────────────────────────────────
+svg.appendChild(el('rect', { x:0, y:0, width:W, height:H, fill:'#0a0c12' }));
+
+// ── Main Title & Legend ─────────────────────────────────────────────────────
+svg.appendChild(el('text', {
+  x:W/2, y:32, 'text-anchor':'middle', fill:'#e2e8f0',
+  'font-size':'22', 'font-weight':'700', 'letter-spacing':'0.5'
+}, 'Estonian–Russian Profile Comparison — EIM 2020 & 2023'));
+svg.appendChild(el('text', {
+  x:W/2, y:52, 'text-anchor':'middle', fill:'#64748b',
+  'font-size':'12', 'letter-spacing':'0.3'
+}, 'Between-group means normalized to each variable\'s theoretical scale range'));
+
+const legY = 76;
+// Estonian
+svg.appendChild(el('circle', { cx:W/2-200, cy:legY, r:7, fill:EST, opacity:0.85 }));
+svg.appendChild(el('text', { x:W/2-200, y:legY+4, 'text-anchor':'middle', fill:'#1e293b', 'font-size':'9', 'font-weight':'700' }, 'E'));
+svg.appendChild(el('text', { x:W/2-188, y:legY+4, fill:'#cbd5e1', 'font-size':'12' }, 'Estonian respondents'));
+// Russian
+svg.appendChild(el('circle', { cx:W/2, cy:legY, r:7, fill:RUS, opacity:0.85 }));
+svg.appendChild(el('text', { x:W/2, y:legY+4, 'text-anchor':'middle', fill:'#1e293b', 'font-size':'9', 'font-weight':'700' }, 'R'));
+svg.appendChild(el('text', { x:W/2+12, y:legY+4, fill:'#cbd5e1', 'font-size':'12' }, 'Russian respondents'));
+
+// Group legend
+const gLegY = legY + 22;
+svg.appendChild(el('rect', { x:W/2-200, y:gLegY-6, width:12, height:12, rx:2, fill:'rgba(6,182,212,0.25)', stroke:'rgba(6,182,212,0.5)', 'stroke-width':1 }));
+svg.appendChild(el('text', { x:W/2-184, y:gLegY+4, fill:'#94a3b8', 'font-size':'11' }, 'Group Interactions'));
+svg.appendChild(el('rect', { x:W/2-40, y:gLegY-6, width:12, height:12, rx:2, fill:'rgba(168,85,247,0.25)', stroke:'rgba(168,85,247,0.5)', 'stroke-width':1 }));
+svg.appendChild(el('text', { x:W/2-24, y:gLegY+4, fill:'#94a3b8', 'font-size':'11' }, 'Interactions with Society'));
+
+// ── Draw a single radar chart ───────────────────────────────────────────────
+function drawRadar(cx, cy, estKey, rusKey, yearLabel) {
+  const g = el('g');
+
+  // Year label above chart
+  g.appendChild(el('text', {
+    x:cx, y:cy - R - 42, 'text-anchor':'middle', fill:'#e2e8f0',
+    'font-size':'18', 'font-weight':'700', 'letter-spacing':'1'
+  }, yearLabel));
+
+  // Grid rings
+  const rings = [0.25, 0.50, 0.75, 1.0];
+  rings.forEach(pct => {
+    const r = pct * R;
+    g.appendChild(el('circle', {
+      cx:cx, cy:cy, r:r,
+      fill:'none', stroke:'rgba(255,255,255,0.07)', 'stroke-width': pct === 1 ? 1.5 : 0.8
+    }));
+    // Ring label (only on right side of center)
+    g.appendChild(el('text', {
+      x:cx+4, y:cy-r+11, fill:'#475569', 'font-size':'8.5'
+    }, (pct*100).toFixed(0) + '%'));
+  });
+
+  // Center dot
+  g.appendChild(el('circle', { cx:cx, cy:cy, r:2, fill:'#334155' }));
+
+  // Axis lines and labels
+  data.forEach((d, i) => {
+    const a = angle(i);
+    const ex = cx + R * Math.cos(a);
+    const ey = cy + R * Math.sin(a);
+
+    g.appendChild(el('line', {
+      x1:cx, y1:cy, x2:ex, y2:ey,
+      stroke:'rgba(255,255,255,0.1)', 'stroke-width':0.8
+    }));
+
+    // Label
+    const labelR = R + 36;
+    const lx = cx + labelR * Math.cos(a);
+    const ly = cy + labelR * Math.sin(a);
+    const lines = d.name.split('\n');
+    const anchor = Math.abs(Math.cos(a)) < 0.15 ? 'middle' : Math.cos(a) > 0 ? 'start' : 'end';
+    const groupColor = d.group === 'gi' ? 'rgba(6,182,212,0.8)' : 'rgba(168,85,247,0.8)';
+
+    lines.forEach((line, li) => {
+      g.appendChild(el('text', {
+        x:lx, y:ly + li * 13 - (lines.length-1)*6.5,
+        'text-anchor':anchor, fill:'#cbd5e1',
+        'font-size':'10', 'font-weight':'600'
+      }, line));
+    });
+
+    // Group indicator dot
+    const dotR = R + 16;
+    const dx = cx + dotR * Math.cos(a);
+    const dy = cy + dotR * Math.sin(a);
+    g.appendChild(el('circle', { cx:dx, cy:dy, r:2.5, fill:groupColor, opacity:0.7 }));
+  });
+
+  // Radar polygons
+  function radarPath(key) {
+    return data.map((d, i) => {
+      const n = norm(d[key], d);
+      const p = pt(cx, cy, i, n);
+      return (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1);
+    }).join(' ') + ' Z';
+  }
+
+  // Estonian fill
+  g.appendChild(el('path', {
+    d: radarPath(estKey),
+    fill: EST, 'fill-opacity': 0.1,
+    stroke: EST, 'stroke-width': 2.2, 'stroke-opacity': 0.8
+  }));
+
+  // Russian fill
+  g.appendChild(el('path', {
+    d: radarPath(rusKey),
+    fill: RUS, 'fill-opacity': 0.07,
+    stroke: RUS, 'stroke-width': 2.2, 'stroke-opacity': 0.8
+  }));
+
+  // Data point dots
+  data.forEach((d, i) => {
+    const ne = norm(d[estKey], d);
+    const nr = norm(d[rusKey], d);
+    const pe = pt(cx, cy, i, ne);
+    const pr = pt(cx, cy, i, nr);
+
+    const estG = el('g', { class:'dot-est', 'data-idx':i, 'data-year':yearLabel, cursor:'pointer' });
+    estG.appendChild(el('circle', { cx:pe.x, cy:pe.y, r:7, fill:EST, opacity:0.9 }));
+    estG.appendChild(el('text', {
+      x:pe.x, y:pe.y+3, 'text-anchor':'middle',
+      fill:'#1e293b', 'font-size':'7.5', 'font-weight':'700'
+    }, d[estKey].toFixed(2)));
+    g.appendChild(estG);
+
+    const rusG = el('g', { class:'dot-rus', 'data-idx':i, 'data-year':yearLabel, cursor:'pointer' });
+    rusG.appendChild(el('circle', { cx:pr.x, cy:pr.y, r:7, fill:RUS, opacity:0.9 }));
+    rusG.appendChild(el('text', {
+      x:pr.x, y:pr.y+3, 'text-anchor':'middle',
+      fill:'#1e293b', 'font-size':'7.5', 'font-weight':'700'
+    }, d[rusKey].toFixed(2)));
+    g.appendChild(rusG);
+  });
+
+  svg.appendChild(g);
+}
+
+// ── Draw both radars ────────────────────────────────────────────────────────
+drawRadar(CX_LEFT,  CY, 'est20', 'rus20', '2020');
+drawRadar(CX_RIGHT, CY, 'est23', 'rus23', '2023');
+
+// ── Divider line between charts ─────────────────────────────────────────────
+svg.appendChild(el('line', {
+  x1:W/2, y1:HEADER_H+10, x2:W/2, y2:H-30,
+  stroke:'rgba(255,255,255,0.06)', 'stroke-width':1, 'stroke-dasharray':'4,4'
+}));
+
+// ── Footer note ─────────────────────────────────────────────────────────────
+svg.appendChild(el('text', {
+  x:W/2, y:H-12, 'text-anchor':'middle', fill:'#475569', 'font-size':'10',
+  'font-style':'italic'
+}, 'Values normalized to 0–100% of each variable\'s theoretical range (scale min \u2192 scale max) \u00b7 Hover over points for details'));
+
+// ── Tooltip ─────────────────────────────────────────────────────────────────
+function showTooltip(e, d, group, year) {
+  const estKey = year === '2020' ? 'est20' : 'est23';
+  const rusKey = year === '2020' ? 'rus20' : 'rus23';
+  const estVal = d[estKey];
+  const rusVal = d[rusKey];
+  const estPct = (norm(estVal, d) * 100).toFixed(0);
+  const rusPct = (norm(rusVal, d) * 100).toFixed(0);
+  const gap = Math.abs(estVal - rusVal).toFixed(2);
+  const higher = estVal > rusVal ? 'Estonian' : rusVal > estVal ? 'Russian' : 'Equal';
+
+  tooltip.innerHTML = `
+    <div class="tt-title" style="color:${group === 'est' ? EST : RUS}">${d.name.replace('\n',' ')} (${year})</div>
+    <div class="tt-desc">${d.description}</div>
+    <div class="tt-divider"></div>
+    <div class="tt-row"><span class="tt-label">Estonian mean</span><span class="tt-val" style="color:${EST}">${estVal.toFixed(2)} (${estPct}%)</span></div>
+    <div class="tt-row"><span class="tt-label">Russian mean</span><span class="tt-val" style="color:${RUS}">${rusVal.toFixed(2)} (${rusPct}%)</span></div>
+    <div class="tt-row"><span class="tt-label">Gap</span><span class="tt-val">${gap} \u00b7 ${higher} higher</span></div>
+    <div class="tt-row"><span class="tt-label">Scale</span><span class="tt-val">${d.scaleMin}\u2013${d.scaleMax}</span></div>
+    <div class="tt-divider"></div>
+    <div class="tt-note">${d.note}</div>
+  `;
+  tooltip.style.display = 'block';
+  positionTooltip(e);
+}
+
+function positionTooltip(e) {
+  let tx = e.clientX + 16;
+  let ty = e.clientY - 10;
+  // Prevent overflow right
+  if (tx + 330 > window.innerWidth) tx = e.clientX - 340;
+  tooltip.style.left = tx + 'px';
+  tooltip.style.top = ty + 'px';
+}
+
+document.querySelectorAll('[class^="dot-"]').forEach(g => {
+  const idx = +g.getAttribute('data-idx');
+  const year = g.getAttribute('data-year');
+  const group = g.classList.contains('dot-est') ? 'est' : 'rus';
+  g.addEventListener('mouseenter', e => showTooltip(e, data[idx], group, year));
+  g.addEventListener('mousemove', positionTooltip);
+  g.addEventListener('mouseleave', () => tooltip.style.display = 'none');
+});
+
+</script>
+</body>
+</html>

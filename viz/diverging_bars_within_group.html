@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EIM — Within-Group Change (Cohen's d), 2020 → 2023</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0a0c12; display:flex; justify-content:center; padding:36px 24px 48px; font-family:'Segoe UI',system-ui,sans-serif; }
+#wrap { width:1300px; }
+svg { display:block; }
+#tooltip {
+  position:fixed; display:none;
+  background:rgba(12,14,20,0.97); border:1px solid rgba(255,255,255,0.13);
+  border-radius:10px; padding:13px 16px; pointer-events:none; max-width:340px;
+  box-shadow:0 6px 28px rgba(0,0,0,0.6); z-index:100;
+  font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; color:#cbd5e1; line-height:1.55;
+}
+#tooltip .tt-title { font-size:13px; font-weight:700; margin-bottom:6px; }
+#tooltip .tt-row { display:flex; justify-content:space-between; gap:24px; font-size:11px; margin-bottom:3px; }
+#tooltip .tt-label { color:#64748b; }
+#tooltip .tt-val { font-weight:600; }
+#tooltip .tt-divider { border-top:1px solid rgba(255,255,255,0.08); margin:7px 0; }
+#tooltip .tt-note { font-size:11px; color:#94a3b8; font-style:italic; margin-top:4px; }
+</style>
+</head>
+<body>
+<div id="wrap"><svg id="chart" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div id="tooltip"></div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('chart');
+const tooltip = document.getElementById('tooltip');
+
+// ── Layout ─────────────────────────────────────────────────────────────────
+const W = 1300, ROW_H = 78, N_ROWS = 10;
+const ML = 290, MR = 200, MT = 150, MB = 70;
+const CW = W - ML - MR;
+const H  = MT + N_ROWS * ROW_H + MB;
+
+svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+svg.setAttribute('width',  W);
+svg.setAttribute('height', H);
+
+// ── Colors ─────────────────────────────────────────────────────────────────
+const EST  = '#60a5fa';
+const RUS  = '#facc15';
+const GI_BG = 'rgba(6,182,212,0.038)';
+const SC_BG = 'rgba(168,85,247,0.038)';
+const AXIS  = 'rgba(255,255,255,0.16)';
+const REF   = 'rgba(255,255,255,0.07)';
+const TICK  = '#64748b';
+
+// ── Data ────────────────────────────────────────────────────────────────────
+// d_inv reflects the same scale inversion logic used in the dumbbell chart:
+// for variables marked `inverted:true`, the raw d sign was flipped so that
+// positive d always means "more of the construct."
+// Source: SESSION_LOG.md §12 Table 2 + §18 (single items).
+
+const data = [
+  { name:'Contact: Russian Speakers',           group:'gi', inverted:true,
+    raw:{est:-0.14, rus:-0.09}, p:{est:0.006, rus:0.103},
+    m20:{est:4.02, rus:1.79}, m23:{est:3.87, rus:1.71},
+    sd20:{est:1.02, rus:0.88}, sd23:{est:1.10, rus:0.80},
+    note:'Inverted: + = more contact with Russian speakers.' },
+  { name:'Contact: Estonian Speakers',          group:'gi', inverted:true,
+    raw:{est:-0.05, rus:-0.55}, p:{est:0.315, rus:0.0001},
+    m20:{est:1.78, rus:3.89}, m23:{est:1.74, rus:3.29},
+    sd20:{est:0.90, rus:1.11}, sd23:{est:0.86, rus:1.10},
+    note:'Inverted: + = more contact with Estonian speakers.' },
+  { name:'Social Distance: Primary Out-group',  group:'gi', inverted:false,
+    raw:{est:+0.43, rus:-0.05}, p:{est:0.0001, rus:0.428},
+    m20:{est:2.50, rus:1.87}, m23:{est:2.91, rus:1.83},
+    sd20:{est:0.89, rus:0.79}, sd23:{est:1.04, rus:0.77},
+    note:'+ = more preferred distance from primary out-group.' },
+  { name:'Minority Support Inclusion',          group:'sc', inverted:true,
+    raw:{est:+0.16, rus:-0.07}, p:{est:0.002, rus:0.245},
+    m20:{est:2.21, rus:1.58}, m23:{est:2.33, rus:1.54},
+    sd20:{est:0.70, rus:0.60}, sd23:{est:0.77, rus:0.60},
+    note:'Inverted: + = stronger support for minority inclusion.' },
+  { name:'Superordinate Identity',              group:'gi', inverted:true,
+    raw:{est:+0.13, rus:-0.03}, p:{est:0.013, rus:0.645},
+    m20:{est:1.43, rus:2.07}, m23:{est:1.50, rus:2.05},
+    sd20:{est:0.49, rus:0.67}, sd23:{est:0.60, rus:0.79},
+    note:'Inverted: + = stronger sense of belonging.' },
+  { name:'Belief in Inevitable Conflict',       group:'sc', inverted:false,
+    raw:{est:-0.08, rus:+0.31}, p:{est:0.111, rus:0.0001},
+    m20:{est:2.77, rus:3.03}, m23:{est:2.72, rus:3.21},
+    sd20:{est:0.57, rus:0.57}, sd23:{est:0.67, rus:0.58},
+    note:'+ = stronger belief that ethnic conflict is inevitable.' },
+  { name:'Comparative Opportunity Assessment', group:'sc', inverted:true,
+    raw:{est:+0.27, rus:+0.33}, p:{est:0.0001, rus:0.0001},
+    m20:{est:2.57, rus:2.14}, m23:{est:2.71, rus:2.32},
+    sd20:{est:0.48, rus:0.57}, sd23:{est:0.52, rus:0.53},
+    note:'Inverted: + = perceives greater Estonian structural advantage.' },
+  { name:'Group ID Patterns',                   group:'gi', inverted:false,
+    raw:{est:-0.01, rus:+0.14}, p:{est:0.85, rus:0.011},
+    m20:{est:2.95, rus:2.69}, m23:{est:2.94, rus:2.81},
+    sd20:{est:0.94, rus:0.81}, sd23:{est:0.95, rus:0.84},
+    note:'+ = identifies more with Estonian people than own ethnic group.' },
+  { name:'Social Distance: General Out-group',  group:'gi', inverted:false,
+    raw:{est:-0.22, rus:-0.54}, p:{est:0.0001, rus:0.0001},
+    m20:{est:2.91, rus:3.10}, m23:{est:2.70, rus:2.60},
+    sd20:{est:1.01, rus:1.02}, sd23:{est:0.90, rus:0.81},
+    note:'+ = more preferred distance from general out-groups. Cross-year item set differs (3 vs 6 items).' },
+  { name:'Territorial Attachment',              group:'sc', inverted:true,
+    raw:{est:-0.02, rus:-0.27}, p:{est:0.55, rus:0.0001},
+    m20:{est:1.24, rus:1.43}, m23:{est:1.23, rus:1.27},
+    sd20:{est:0.51, rus:0.59}, sd23:{est:0.51, rus:0.53},
+    note:'Inverted: + = stronger feeling of being at home in Estonia.' },
+];
+
+// Compute display d (after inversion) for each row
+data.forEach(d => {
+  const flip = d.inverted ? -1 : 1;
+  d.dEst = d.raw.est * flip;
+  d.dRus = d.raw.rus * flip;
+});
+
+// ── Scale ───────────────────────────────────────────────────────────────────
+const D_MAX = 0.65;  // covers max observed |d| ~0.55 with headroom
+const xZero = ML + CW / 2;
+const xScale = d => xZero + (d / D_MAX) * (CW / 2);
+
+// Helpers
+function el(tag, attrs={}, text=null) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text !== null) e.textContent = text;
+  return e;
+}
+function fmtD(d) { return (d>=0?'+':'') + d.toFixed(2); }
+function sigStars(p) {
+  if (p < 0.001) return '***';
+  if (p < 0.01)  return '**';
+  if (p < 0.05)  return '*';
+  return 'ns';
+}
+function pStr(p) { return p < 0.0001 ? '<.0001' : p.toFixed(p<0.01?4:3); }
+
+// ── Title block ─────────────────────────────────────────────────────────────
+svg.appendChild(el('text', {x:ML, y:42, fill:'#f1f5f9', 'font-size':24, 'font-weight':700},
+  'Within-Group Change, 2020 → 2023'));
+svg.appendChild(el('text', {x:ML, y:70, fill:'#94a3b8', 'font-size':14},
+  "Cohen's d for each ethnic group across composites and single-item measures"));
+svg.appendChild(el('text', {x:ML, y:92, fill:'#64748b', 'font-size':12, 'font-style':'italic'},
+  '+ d → more of the construct (after scale inversion where indicated). Faded bars are non-significant (p ≥ .05).'));
+
+// Legend (top-right)
+const legendY = 56;
+let lx = W - MR - 8;
+[['Russian', RUS], ['Estonian', EST]].forEach(([lbl, c], i) => {
+  const cx = lx - i*120;
+  svg.appendChild(el('rect', {x:cx-90, y:legendY-10, width:14, height:14, fill:c, rx:2}));
+  svg.appendChild(el('text', {x:cx-72, y:legendY+1, fill:'#cbd5e1', 'font-size':12}, lbl));
+});
+
+// ── Background bands by domain group ────────────────────────────────────────
+data.forEach((d, i) => {
+  const y = MT + i * ROW_H;
+  svg.appendChild(el('rect', {
+    x: ML - 16, y: y - 4, width: CW + 32, height: ROW_H - 8,
+    fill: d.group === 'gi' ? GI_BG : SC_BG, rx: 6
+  }));
+});
+
+// ── Reference grid (vertical) ───────────────────────────────────────────────
+const refTicks = [-0.5, -0.2, 0, 0.2, 0.5];
+refTicks.forEach(t => {
+  const x = xScale(t);
+  const isZero = (t === 0);
+  svg.appendChild(el('line', {
+    x1:x, x2:x, y1:MT-12, y2:MT + N_ROWS*ROW_H,
+    stroke: isZero ? AXIS : REF,
+    'stroke-width': isZero ? 1.5 : 1,
+    'stroke-dasharray': isZero ? null : '3,4'
+  }));
+  svg.appendChild(el('text', {
+    x, y: MT + N_ROWS*ROW_H + 22,
+    fill: isZero ? '#cbd5e1' : TICK,
+    'font-size': 11, 'text-anchor':'middle'
+  }, fmtD(t)));
+});
+
+// "small / medium" effect-size annotations
+svg.appendChild(el('text', {
+  x: xScale(0.2), y: MT - 22, fill: TICK, 'font-size':10, 'text-anchor':'middle', 'font-style':'italic'
+}, 'small'));
+svg.appendChild(el('text', {
+  x: xScale(0.5), y: MT - 22, fill: TICK, 'font-size':10, 'text-anchor':'middle', 'font-style':'italic'
+}, 'medium'));
+svg.appendChild(el('text', {
+  x: xScale(-0.2), y: MT - 22, fill: TICK, 'font-size':10, 'text-anchor':'middle', 'font-style':'italic'
+}, 'small'));
+svg.appendChild(el('text', {
+  x: xScale(-0.5), y: MT - 22, fill: TICK, 'font-size':10, 'text-anchor':'middle', 'font-style':'italic'
+}, 'medium'));
+
+// X-axis label
+svg.appendChild(el('text', {
+  x: xZero, y: MT + N_ROWS*ROW_H + 50,
+  fill:'#94a3b8', 'font-size':12, 'text-anchor':'middle'
+}, "Cohen's d (within-group, 2020 → 2023)"));
+
+// ── Rows ────────────────────────────────────────────────────────────────────
+const BAR_H = 22;
+const BAR_GAP = 6;
+const ROW_PAD = (ROW_H - 2*BAR_H - BAR_GAP) / 2;
+
+data.forEach((d, i) => {
+  const yTop = MT + i * ROW_H + ROW_PAD;          // Estonian bar
+  const yBot = yTop + BAR_H + BAR_GAP;            // Russian bar
+  const yMid = (yTop + yBot + BAR_H) / 2;
+
+  // Variable label (left)
+  const labelLines = wrapLabel(d.name, 32);
+  labelLines.forEach((ln, idx) => {
+    svg.appendChild(el('text', {
+      x: ML - 18, y: yMid - (labelLines.length-1)*7 + idx*14 - 2,
+      fill:'#e2e8f0', 'font-size':13, 'font-weight':600, 'text-anchor':'end'
+    }, ln));
+  });
+  // Inversion tag
+  if (d.inverted) {
+    svg.appendChild(el('text', {
+      x: ML - 18, y: yMid + (labelLines.length)*7 + 6,
+      fill:'#64748b', 'font-size':10, 'text-anchor':'end', 'font-style':'italic'
+    }, '(inverted scale)'));
+  }
+
+  // Estonian bar
+  drawBar(d, 'est', yTop, EST);
+  // Russian bar
+  drawBar(d, 'rus', yBot, RUS);
+});
+
+function drawBar(d, key, y, color) {
+  const dv = key === 'est' ? d.dEst : d.dRus;
+  const p  = key === 'est' ? d.p.est : d.p.rus;
+  const sig = p < 0.05;
+  const x0 = xZero;
+  const x1 = xScale(dv);
+  const x  = Math.min(x0, x1);
+  const w  = Math.abs(x1 - x0);
+
+  const rect = el('rect', {
+    x, y, width: Math.max(w, 1.5), height: BAR_H,
+    fill: color, rx: 3,
+    'fill-opacity': sig ? 0.92 : 0.28,
+    stroke: sig ? 'none' : color,
+    'stroke-width': sig ? 0 : 1,
+    'stroke-opacity': sig ? 0 : 0.6,
+    'stroke-dasharray': sig ? null : '4,3'
+  });
+  svg.appendChild(rect);
+
+  // d label at end of bar
+  const labelX = dv >= 0 ? x1 + 8 : x1 - 8;
+  const anchor = dv >= 0 ? 'start' : 'end';
+  svg.appendChild(el('text', {
+    x: labelX, y: y + BAR_H/2 + 4,
+    fill: sig ? '#f1f5f9' : '#94a3b8',
+    'font-size': 12, 'font-weight': sig ? 700 : 500,
+    'text-anchor': anchor
+  }, fmtD(dv) + ' ' + sigStars(p)));
+
+  // Hover hit-area (extends slightly past the bar)
+  const hit = el('rect', {
+    x: Math.min(x, x1) - 4, y: y - 3,
+    width: Math.max(w, 1.5) + 8, height: BAR_H + 6,
+    fill:'transparent', cursor:'default'
+  });
+  hit.addEventListener('mousemove', (ev) => showTip(ev, d, key));
+  hit.addEventListener('mouseleave', hideTip);
+  svg.appendChild(hit);
+}
+
+function wrapLabel(s, max) {
+  if (s.length <= max) return [s];
+  const words = s.split(' ');
+  const out = []; let cur = '';
+  for (const w of words) {
+    if ((cur + ' ' + w).trim().length > max) { out.push(cur.trim()); cur = w; }
+    else cur += ' ' + w;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+
+// ── Tooltip ────────────────────────────────────────────────────────────────
+function showTip(ev, d, key) {
+  const groupName = key === 'est' ? 'Estonian' : 'Russian';
+  const dv  = key === 'est' ? d.dEst : d.dRus;
+  const raw = key === 'est' ? d.raw.est : d.raw.rus;
+  const p   = key === 'est' ? d.p.est : d.p.rus;
+  const m20 = key === 'est' ? d.m20.est : d.m20.rus;
+  const m23 = key === 'est' ? d.m23.est : d.m23.rus;
+  const sd20= key === 'est' ? d.sd20.est : d.sd20.rus;
+  const sd23= key === 'est' ? d.sd23.est : d.sd23.rus;
+
+  tooltip.innerHTML = `
+    <div class="tt-title" style="color:${key==='est'?EST:RUS}">${groupName} — ${d.name}</div>
+    <div class="tt-row"><span class="tt-label">2020 mean (SD)</span><span class="tt-val">${m20.toFixed(2)} (${sd20.toFixed(2)})</span></div>
+    <div class="tt-row"><span class="tt-label">2023 mean (SD)</span><span class="tt-val">${m23.toFixed(2)} (${sd23.toFixed(2)})</span></div>
+    <div class="tt-divider"></div>
+    <div class="tt-row"><span class="tt-label">Raw d</span><span class="tt-val">${fmtD(raw)}</span></div>
+    <div class="tt-row"><span class="tt-label">Display d ${d.inverted?'(inverted)':''}</span><span class="tt-val">${fmtD(dv)}</span></div>
+    <div class="tt-row"><span class="tt-label">p-value</span><span class="tt-val">${pStr(p)} ${sigStars(p)}</span></div>
+    <div class="tt-note">${d.note}</div>
+  `;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (ev.clientX + 14) + 'px';
+  tooltip.style.top  = (ev.clientY + 14) + 'px';
+}
+function hideTip() { tooltip.style.display = 'none'; }
+</script>
+</body>
+</html>

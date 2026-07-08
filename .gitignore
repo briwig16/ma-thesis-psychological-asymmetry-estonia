@@ -1,0 +1,43 @@
+# ==== Protected / restricted data — NEVER commit ====
+# The EIM survey data is owned by the Estonian government and used under a
+# special-access agreement. No raw data may be published.
+data/
+codebook/
+correspondence/
+*.csv
+*.tsv
+*.sav
+*.dta
+*.rds
+*.RData
+*.por
+
+# ==== Dependencies ====
+node_modules/
+**/node_modules/
+
+# ==== Python ====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# ==== R ====
+.Rproj.user/
+.Rhistory
+.Ruserdata
+
+# ==== AI / session logs ====
+.claude/
+CLAUDE.md
+SESSION_LOG*.md
+mds/
+
+# ==== OS / editor ====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.textClipping
